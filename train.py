@@ -12,6 +12,7 @@ from networks import *
 from utils import *
 from config import *
 
+save_file = model_filename
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 dataset = Flowers(DATASET_DIR, device, sigma)  # returns an entire point cloud [N, 3] as the training instance
@@ -61,18 +62,11 @@ for epoch in range(epochs):
         shape_batch.requires_grad = False
         shape_gt_batch.requires_grad = False
 
-        lat_inds = latent_indices.cpu().detach().numpy()
-        latent_inputs = torch.ones((lat_inds.shape[0], latent_size), dtype=torch.float32, requires_grad=True).to(
-            device)  # ones with shape=(batchsize, latentvectorsize). Notice how requires_grad=True was used since we want the gradient to connect back to the latent_vecs list of params
-        i = 0
-        for ind in lat_inds:  #
-            latent_inputs[i] *= latent_vecs[ind]  # extract the latent vectors corresponding to this batch. Why cant you just say latent_inputs = latent_vecs[lats_inds]????
-            i += 1
+        latent_repeat = contruct_latent_repeat_tensor(shape_batch, latent_indices, latent_vecs, device='cuda')
 
-        latent_repeat = latent_inputs.unsqueeze(-1).expand(-1, -1, shape_batch.size()[-1])  #  shape=(batchsize, latentvectorsize, N)  Any dimension of size 1 can be expanded(ie repeated n times) to an arbitrary value without allocating new memory. Here he expands the singleton dim=2 to be
         shape_batch = shape_batch.to(device)
         shape_gt_batch = shape_gt_batch.to(device)
-        loss, chamfer, l2 = model(shape_batch, shape_gt_batch, latent_repeat)
+        (loss, chamfer, l2), pc_est = model(shape_batch, shape_gt_batch, latent_repeat)
 
         optimizer.zero_grad()
         loss.backward()
@@ -95,5 +89,5 @@ for epoch in range(epochs):
     #     save_name = os.path.join(CHECKPOINT_DIR, 'model_routine')
     #     save_checkpoint(save_name, model, latent_vecs, optimizer)
 
-save_name = os.path.join(CHECKPOINT_DIR, 'model_best')
+save_name = os.path.join(CHECKPOINT_DIR, save_file)
 save_checkpoint(save_name, model, latent_vecs, optimizer)

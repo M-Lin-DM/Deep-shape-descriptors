@@ -22,10 +22,11 @@ class DeepLatent(nn.Module):
     def forward(self, pc, pc_gt, latent):
         # self.pc = deepcopy(pc)  # this prevents the gradient from reaching back to the input tensor. But is it equivalent to using requires_grad=False?
         # self.pc_gt = deepcopy(pc_gt)
+
         predicted_noise = self.pdl_net(pc, latent)  # note that the first arg is not used!
         pc_est = pc - predicted_noise
         loss = self.compute_loss(pc_est, pc_gt)
-        return loss
+        return loss, pc_est
 
     def compute_loss(self, pc_est, pc_gt):
         loss_chamfer = self.chamfer_dist(pc_gt, pc_est)

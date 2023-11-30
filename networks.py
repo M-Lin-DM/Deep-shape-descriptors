@@ -45,7 +45,7 @@ class PDLNet(nn.Module):
         x = torch.cat([z, x], 1)
         x = self.dropout(F.relu(self.ln4(self.conv4(x))))
         x = self.dropout(F.relu(self.ln5(self.conv5(x))))
-        x1 = self.dropout((self.ln6(self.conv6(x))))
+        x1 = self.dropout(self.conv6(x))
         return x1
 
 

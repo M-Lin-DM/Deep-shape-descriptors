@@ -1,10 +1,12 @@
 DATASET_DIR = r"D:\Datasets\VAE_zeroshot\data_full\unprocessed\point clouds"
-sigma = 0.03  # std of noise added to each point
-batch_size = 64
-latent_size = 128
-lr = 0.01
-epochs = 50
+sigma = 0.04  # std of noise added to each point
+batch_size = 16
+latent_size = 4  # a large latent size will lead to sparse data manifold in latent vector space, but perhaps better denoising performance. Smaller dim should encourage more connected latent space that can be interpolated.
+lr = 0.005
+epochs = 30
 N = 1000
 pc_dim = 2  # dimensionality of the point cloud embedding space
 log_interval = 10
 CHECKPOINT_DIR = r"C:\Users\MrLin\OneDrive\Documents\Experiments\Deep shape descriptor\SAVED MODELS"
+model_filename = 'MODEL_znoise'
+latent_filename = 'LATENTS_znoise'

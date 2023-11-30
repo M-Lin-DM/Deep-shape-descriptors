@@ -10,6 +10,7 @@ from copy import deepcopy
 from torch.utils.data import Dataset
 
 from config import *
+from utils import *
 
 
 def get_mean_dis(pc):
@@ -17,12 +18,6 @@ def get_mean_dis(pc):
     mean_dis = np.mean(pc - center)
     print(mean_dis)
     return mean_dis
-
-@torch.no_grad()
-def add_gaussian_noise(pc, sigma=0.02):
-    # pc [N*3]
-    noise = torch.randn_like(pc)
-    return pc + noise * sigma
 
 
 class Flowers(Dataset):
