@@ -1,0 +1,10 @@
+DATASET_DIR = r"D:\Datasets\VAE_zeroshot\data_full\unprocessed\point clouds"
+sigma = 0.03  # std of noise added to each point
+batch_size = 64
+latent_size = 128
+lr = 0.01
+epochs = 50
+N = 1000
+pc_dim = 2  # dimensionality of the point cloud embedding space
+log_interval = 10
+CHECKPOINT_DIR = r"C:\Users\MrLin\OneDrive\Documents\Experiments\Deep shape descriptor\SAVED MODELS"
