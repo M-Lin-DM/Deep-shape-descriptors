@@ -29,6 +29,32 @@ class Flowers(Dataset):
 
     def __getitem__(self, index, is_online=True):
         pc_gt = self.data[index]  # numpy array
+        # rotation augmentation by random angle
+        # pc_gt = rotate_points(pc_gt)
+
+        pc_gt = torch.FloatTensor(pc_gt).to(self.device)  # convert to tensor
+        pc = add_gaussian_noise(pc_gt, sigma=self.sigma)  # shape=(N, 3)
+        pc_gt = pc_gt.transpose(0, 1)  #
+        pc = pc.transpose(0, 1)
+
+        return pc, pc_gt, index  # (3,N), (3,N), (1,)
+
+    def __len__(self):
+        return len(self.data)
+
+
+class Flowers_val(Dataset):
+    def __init__(self, root, device, sigma=0.04):
+        self.sigma = sigma
+        self.device = device
+        self.data = np.load(os.path.join(root, DATASET_DIR, 'pc_list_val.npy'))
+        self.indices = range(self.data.shape[0])
+
+    def __getitem__(self, index, is_online=True):
+        pc_gt = self.data[index]  # numpy array
+        # rotation augmentation by random angle
+        # pc_gt = rotate_points(pc_gt)
+
         pc_gt = torch.FloatTensor(pc_gt).to(self.device)  # convert to tensor
         pc = add_gaussian_noise(pc_gt, sigma=self.sigma)  # shape=(N, 3)
         pc_gt = pc_gt.transpose(0, 1)  #

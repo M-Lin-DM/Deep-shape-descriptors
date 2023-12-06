@@ -1,28 +1,34 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+
 from dataloader import *
 from deeplatent import *
 from utils import *
 from config import *
 
-load_file = latent_filename
-device = "cuda" if torch.cuda.is_available() else "cpu"
+# load_file = latent_filename
+load_file = model_filename
 
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 save_name = os.path.join(CHECKPOINT_DIR, load_file)
 z_ts = torch.load(save_name + '_latents.pt').cpu().detach().numpy()
 print(z_ts.shape)
+print(z_ts)
 
-emb = embed_tsne(z_ts, initial_pos=None)
+# emb = embed_tsne(z_ts, initial_pos=None)
 # emb = embed_umap(z_ts)
 
-kmeans, labels, cluster_centers = kmeans_clustering(z_ts, 350)
-scatter3D(emb[:, :3], labels)
+kmeans, labels, cluster_centers = kmeans_clustering(z_ts, 20)
+# scatter3D(emb[:, :3], labels)
+scatter3D(z_ts[:, :3], labels)
+# sys.exit()  # terminate execution
 
 dataset = Flowers(DATASET_DIR, device, sigma)  # returns an entire point cloud [N, 3] as the training instance
 # shape_batch, shape_gt_batch, latent_indices = next(iter(dataset))
 
+# plot shapes from each cluster
 for c in range(10):
     cluster_ind = np.where(labels == c)[0]  # numpy array of indices of data points sharing a certain cluster ID
     # print(len(cluster_ind))

@@ -13,13 +13,18 @@ from utils import *
 from config import *
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-load_file = latent_filename
-# load_file = model_filename
+# load_file = latent_filename
+load_file = model_filename
 
 dataset = Flowers(DATASET_DIR, device, sigma)  # returns an entire point cloud [N, 3] as the training instance
 loader = DataLoader(dataset, batch_size=8, shuffle=False)
 shape_batch, shape_gt_batch, latent_indices = next(iter(loader))  # the noise added is random each time, so there's a kind of automatic data augmentation going on
 print(f"shape of model input: {shape_batch.shape}")
+
+# randomize point cloud to uniform distribution in 2D
+# shape_batch = shape_batch + torch.randn_like(shape_batch) * 0.0  #adding noise somehow changes the models prediction meaning that points are not independent of each other
+# shape_batch = torch.rand_like(shape_batch) * 2 - 1
+# shape_batch = shape_gt_batch
 
 
 num_total_instance = len(dataset)
@@ -28,12 +33,18 @@ print(f"num_batch {num_batch}")
 
 model = DeepLatent(latent_length=latent_size, n_points_per_cloud=N, chamfer_weight=0.1)
 model, latent_vecs, optimizer = load_checkpoint(os.path.join(CHECKPOINT_DIR, load_file), model, None)
+
+# try noiseing latent vects to see if it affects the predictions
+# for i, v in enumerate(latent_vecs):
+#     latent_vecs[i] = torch.rand_like(latent_vecs[i]) * 2 - 1
+
+# print(latent_vecs)
 shape_batch.to(device)
 shape_gt_batch.to(device)
 model.to(device)
 
 latent_repeat = contruct_latent_repeat_tensor(shape_batch, latent_indices, latent_vecs, device='cuda', use_noise=False)
-# latent_repeat = add_gaussian_noise(latent_repeat, sigma=0.1)
+# print(latent_repeat)
 
 # latent_vecs is a list of tenors of length 128
 # print(shape_batch.shape, latent_repeat)

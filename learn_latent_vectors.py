@@ -5,6 +5,8 @@ from torch.utils.data import Dataset, DataLoader
 import torch.optim as optim
 import torch.nn as nn
 import torch
+import wandb
+import time
 
 from dataloader import *
 from deeplatent import *
@@ -12,46 +14,47 @@ from networks import *
 from utils import *
 from config import *
 
+wandb.login()
+
+wandb.init(project="deep shape descriptors", config=hyperparams)  # this initializes a new run on wandb. config=hyperparams sets wandb.config, a dictionary-like object. hyperparams is a dictionary.
+wconfig = wandb.config
+
 load_file = model_filename
 save_file = latent_filename
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-dataset = Flowers(DATASET_DIR, device, sigma)  # returns an entire point cloud [N, 3] as the training instance
-loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+dataset = Flowers(DATASET_DIR, device, wconfig.sigma)  # returns an entire point cloud [N, 3] as the training instance
+loader = DataLoader(dataset, batch_size=wconfig.batch_size, shuffle=True)
 shape_batch, shape_gt_batch, latent_indices = next(iter(loader))
-
 print(f"shape of model input: {shape_batch.shape}")
-# checkpoint_dir = config.save_dir
-
+assert shape_batch.shape[2] == N
 num_total_instance = len(dataset)
 num_batch = len(loader)
-
 print(f"num_batch {num_batch}")
 
-model = DeepLatent(latent_length=latent_size, n_points_per_cloud=N, chamfer_weight=0.1)
+
+model = DeepLatent(latent_length=wconfig.latent_size, n_points_per_cloud=N, chamfer_weight=0.1)
 
 # initialize all latent vectors in the dataset
-latent_vecs = []
-for i in range(len(dataset)):
-    vec = (torch.ones(latent_size).normal_(0, 0.9).to(device))  # draw values from normal distribution with mean and std
-    vec.requires_grad = True
-    latent_vecs.append(vec)
+latent_vecs = initialize_latent_vecs(dataset, device)
 
 print("before training:", latent_vecs[0])
+# time.sleep(5)
 
 optimizer = optim.Adam([
     {
-        "params": latent_vecs, "lr": lr * 0.5,
+        "params": latent_vecs, "lr": wconfig.lr * 3,
     }
 ]
 )
+
 model, _, _ = load_checkpoint(os.path.join(CHECKPOINT_DIR, load_file), model, optimizer)
 
 model.to(device)
 min_loss = float('inf')
 
-for epoch in range(epochs):
+for epoch in range(wconfig.epochs):
     print(f"epoch {epoch}")
     training_loss = 0.0
     model.train()
@@ -61,11 +64,20 @@ for epoch in range(epochs):
         shape_batch.requires_grad = False
         shape_gt_batch.requires_grad = False
 
-        latent_repeat = contruct_latent_repeat_tensor(shape_batch, latent_indices, latent_vecs, device='cuda')
+        latent_repeat = contruct_latent_repeat_tensor(shape_batch, latent_indices, latent_vecs, device='cuda', use_noise=False, wconfig=wconfig)
 
         shape_batch.to(device)
         shape_gt_batch.to(device)
         (loss, chamfer, l2), pc_est = model(shape_batch, shape_gt_batch, latent_repeat)
+
+        # Compute l2 loss component. This is different from the l2 used as a distance between the point clouds
+        l_weight = 0.0
+        l_parameters = []
+        for parameter in model.parameters():
+            l_parameters.append(parameter.view(-1))  # -1 flattens the param tensor
+        L2 = l_weight * model.compute_L2_regularization_loss(torch.cat(l_parameters))  # cat all params into a single vector
+        # Add l2 loss component
+        loss += L2
 
         optimizer.zero_grad()
         loss.backward()
@@ -73,10 +85,20 @@ for epoch in range(epochs):
         training_loss += loss.item()
 
         print("Epoch:[%d|%d], Batch:[%d|%d]  loss: %f , chamfer: %f, l2: %f" % (
-        epoch, epochs, index, num_batch, loss.item() / batch_size, chamfer.item() / batch_size,
-        l2.item() / batch_size))
+        epoch, wconfig.epochs, index, num_batch, loss.item() / wconfig.batch_size, chamfer.item() / wconfig.batch_size,
+        l2.item() / wconfig.batch_size))
 
     training_loss_epoch = training_loss / len(dataset)  # loss per training instance
+    z_tensor = torch.stack(latent_vecs, dim=1).transpose(0,
+                                                         1)  # concats along a NEW dimension. torch.cat concats along EXISTING dim
+    z_cloud_std = torch.norm(torch.std(z_tensor, dim=0), p=2)
+    # z_mean = torch.sum(torch.mean(z_tensor, dim=0)).cpu().detach().numpy()
+    # conv1 = model.state_dict()['pdl_net.conv1.weight'].squeeze().cpu().detach().numpy()[
+    #         :20]  # weights from first conv layer
+    z_tensor_samp = z_tensor[:20].cpu().detach().numpy()
+
+    # wandb.log({"train": {"acc": 0.9}, "val": {"acc": 0.8}})
+    wandb.log({"train-loss": training_loss_epoch, "z_cloud_std": z_cloud_std, "latent_vecs": wandb.Image(z_tensor_samp)})
 
     print("after epoch:", latent_vecs[0])
 

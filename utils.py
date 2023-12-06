@@ -57,29 +57,10 @@ def pc_batch_to_data_matrices_list(pc_batch):
     # Args: pc_batch shape=(batch_size, spatial dims, number of points in cloud)
     data_matricies = []
     for pc in pc_batch:
-        dat = pc.squeeze().transpose(0, 1)
+        dat = pc.transpose(0, 1)
         data_matricies.append(dat.cpu().detach().numpy())
 
     return data_matricies
-
-
-def contruct_latent_repeat_tensor(shape_batch, latent_indices, latent_vecs, device='cuda', use_noise=True):
-    lat_inds = latent_indices.cpu().detach().numpy()
-    latent_inputs = torch.ones((lat_inds.shape[0], latent_size), dtype=torch.float32, requires_grad=True).to(
-        device)  # ones with shape=(batchsize, latentvectorsize). Notice how requires_grad=True was used since we want the gradient to connect back to the latent_vecs list of params
-    i = 0
-    for ind in lat_inds:  #
-        latent_inputs[i] *= latent_vecs[
-            ind]  # extract the latent vectors corresponding to this batch. Why cant you just say latent_inputs = latent_vecs[lats_inds]????
-        i += 1
-
-    if use_noise:
-        latent_inputs = add_gaussian_noise(latent_inputs, sigma=0.01)
-
-    latent_repeat = latent_inputs.unsqueeze(-1).expand(-1, -1, shape_batch.size()[
-        -1])  # shape=(batchsize, latentvectorsize, N)  Any dimension of size 1 can be expanded(ie repeated n times) to an arbitrary value without allocating new memory. Here he expands the singleton dim=2 to be
-
-    return latent_repeat
 
 
 def embed_tsne(data_matrix_norm, initial_pos=None):
@@ -130,3 +111,72 @@ def kmeans_clustering(dat, n_clusters):
     kmeans.fit(dat)
 
     return kmeans, kmeans.labels_, kmeans.cluster_centers_
+
+
+def initialize_latent_vecs(dataset, device):
+    # produces a list of tensors representing the latent vectors
+    latent_vecs = []
+    for i in range(len(dataset)):
+        vec = (torch.zeros(latent_size).to(
+            device))  # draw values from normal distribution with mean and std
+        vec.requires_grad = True  # vec = torch.nn.Parameter(vec)  # make it a parameter to be optimized
+        latent_vecs.append(vec)
+
+    return latent_vecs
+
+
+def contruct_latent_repeat_tensor(shape_batch, latent_indices, latent_vecs, device='cuda', use_noise=True,
+                                  wconfig=None):
+    lat_inds = latent_indices.cpu().detach().numpy()
+    latent_inputs = torch.ones((lat_inds.shape[0], latent_size), dtype=torch.float32, requires_grad=True).to(
+        device)  # ones with shape=(batchsize, latentvectorsize). Notice how requires_grad=True was used since we want the gradient to connect back to the latent_vecs list of params
+    i = 0
+    for ind in lat_inds:  #
+        latent_inputs[i] *= latent_vecs[
+            ind]  # extract the latent vectors corresponding to this batch. Why cant you just say latent_inputs = latent_vecs[lats_inds]????
+        i += 1
+
+    if use_noise:
+        latent_inputs = add_gaussian_noise(latent_inputs, sigma=wconfig.sigma_z)
+
+    latent_repeat = latent_inputs.unsqueeze(-1).expand(-1, -1, shape_batch.size()[
+        -1])  # shape=(batchsize, latentvectorsize, N)  Any dimension of size 1 can be expanded(ie repeated n times) to an arbitrary value without allocating new memory. Here he expands the singleton dim=2 to be
+
+    return latent_repeat
+
+
+import numpy as np
+
+
+def rotate_points(dat, angle_range=(-180, 180)):
+    """
+    Randomly rotate a set of 2D points.
+
+    Parameters:
+        dat (numpy.ndarray): The 2D points to be rotated. Shape (num_points, 2).
+        angle_range (tuple): The range of rotation angles in degrees. Default: (-180, 180).
+
+    Returns:
+        numpy.ndarray: The rotated 2D points. Same shape as `dat`.
+    """
+
+    # Generate random rotation angles
+    angles = np.random.uniform(*angle_range)
+
+    # Convert angles to radians
+    angles_rad = np.deg2rad(angles)
+
+    # Rotation matrix
+    R = np.array([[np.cos(angles_rad), -np.sin(angles_rad)],
+                  [np.sin(angles_rad), np.cos(angles_rad)]])
+
+    # Apply rotation to points
+    rotated_points = np.dot(dat, R.T)
+
+    return rotated_points
+
+
+def init_weights(layer):
+    if isinstance(layer, torch.nn.Conv1d):
+        torch.nn.init.xavier_uniform(layer.weight)
+        # layer.bias.data.fill_(0.01)

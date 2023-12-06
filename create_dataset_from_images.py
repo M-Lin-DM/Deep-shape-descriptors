@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from utils import center_and_rescale
 
 DATASET_DIR = r"D:\Datasets\VAE_zeroshot\data_full\unprocessed\point clouds"
-train_img_dir = r"D:\Datasets\VAE_zeroshot\data_full\unprocessed\train"
+train_img_dir = r"D:\Datasets\VAE_zeroshot\data_full\unprocessed\validation"
 train_img_path = Path(train_img_dir)
 img_files = list(train_img_path.glob('*.png'))  # will list the entire path
 
@@ -15,7 +15,7 @@ pc_list = []
 for j, image_path in enumerate(img_files):
     print(j)
     if j < 5000:
-        image = Image.open(image_path).convert('1')
+        image = Image.open(image_path).convert('1')  # convert to binary
         img_arr = np.array(image)
 
         # print(np.sum(~img_arr))
@@ -25,7 +25,7 @@ for j, image_path in enumerate(img_files):
             continue
 
         # Combine row and column indices into a single array of coordinates
-        coordinates = np.vstack((row_indices, col_indices)).T
+        coordinates = np.vstack((row_indices, col_indices)).T  # NOTE: this treats the row (ie y) as the x coord so the image will appear rotated 90 from the initial png image
         coordinates = center_and_rescale(coordinates)
 
         # sample fixed number of points N
@@ -36,4 +36,4 @@ for j, image_path in enumerate(img_files):
 #         plt.imshow(img_arr)
 
 
-np.save(f'{DATASET_DIR}\\pc_list.npy', pc_list, allow_pickle=True)
+np.save(f'{DATASET_DIR}\\pc_list_val.npy', pc_list, allow_pickle=True)
